@@ -35,7 +35,13 @@ trait CanSplitIndexIntoChunks
             $this->currentChunk = LogIndexChunk::fromDefinitionArray($this->currentChunkDefinition);
 
             if ($this->currentChunk->size > 0) {
-                $this->currentChunk->data = $this->getChunkDataFromCache($this->currentChunk->index, []);
+                $data = $this->getChunkDataFromCache($this->currentChunk->index);
+                $this->currentChunk->data = $data ?? [];
+
+                if (is_null($data)) {
+                    // The current chunk was evicted from cache while the metadata survived.
+                    $this->markForRebuild();
+                }
             }
         }
 
@@ -68,6 +74,12 @@ trait CanSplitIndexIntoChunks
             $chunkData = $currentChunk->data ?? [];
         } else {
             $chunkData = $this->getChunkDataFromCache($index);
+
+            if (is_null($chunkData) && ($this->getChunkDefinition($index)['size'] ?? 0) > 0) {
+                // The chunk was evicted from cache while the index metadata survived.
+                // Flag the index so the next scan rebuilds it from scratch.
+                $this->markForRebuild();
+            }
         }
 
         return $chunkData;

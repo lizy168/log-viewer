@@ -58,6 +58,12 @@ class IndexedLogReader extends BaseLogReader implements LogReaderInterface
             return $this;
         }
 
+        if ($this->index()->requiresRebuild()) {
+            // A partially-evicted index cannot be resumed (the scan position is at the end
+            // of the file) or re-scanned in place (surviving chunks would duplicate entries).
+            $force = true;
+        }
+
         if ($this->numberOfNewBytes() < 0) {
             // the file reduced in size... something must've gone wrong, so let's
             // force a full re-index.
@@ -274,6 +280,20 @@ class IndexedLogReader extends BaseLogReader implements LogReaderInterface
 
     public function requiresScan(): bool
     {
+        if ($this->index()->requiresRebuild()) {
+            // A cached index chunk was lost; rebuild on the next scan.
+            return true;
+        }
+
+        // File metadata can outlive index cache entries; rebuild when the index was lost.
+        if ($this->file->size() > 0) {
+            $index = $this->index();
+
+            if ($index->getLastScannedFilePosition() === 0 && $index->count() === 0) {
+                return true;
+            }
+        }
+
         if (isset($this->mtimeBeforeScan) && ($this->file->mtime() > $this->mtimeBeforeScan || $this->file->mtime() === time())) {
             // The file has been modified since the last scan in this request.
             // Let's only request another scan if it's not the last chunk (smaller than lazyScanChunkSize).

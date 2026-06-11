@@ -40,6 +40,28 @@ trait PreservesIndexingProgress
         return $this->file->size() !== $this->getLastScannedFilePosition();
     }
 
+    public function markForRebuild(): void
+    {
+        if ($this->rebuildRequired ?? false) {
+            return;
+        }
+
+        $this->rebuildRequired = true;
+
+        // Persist immediately so the next request sees the flag even though
+        // the current request is mid-read and won't save the index itself.
+        $this->saveMetadata();
+    }
+
+    public function requiresRebuild(): bool
+    {
+        if (! isset($this->rebuildRequired)) {
+            $this->loadMetadata();
+        }
+
+        return $this->rebuildRequired;
+    }
+
     public function getEarliestTimestamp(): ?int
     {
         $earliestTimestamp = null;
