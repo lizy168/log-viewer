@@ -2,7 +2,10 @@
 
 use Illuminate\Support\Facades\File;
 use Opcodes\LogViewer\Exceptions\CannotOpenFileException;
+use Opcodes\LogViewer\Facades\Cache as LogViewerCache;
+use Opcodes\LogViewer\LogFile;
 use Opcodes\LogViewer\Readers\IndexedLogReader;
+use Opcodes\LogViewer\Utils\GenerateCacheKey;
 use Spatie\TestTime\TestTime;
 
 beforeEach(function () {
@@ -41,6 +44,43 @@ it('can re-scan the file after a new entry has been added', function () {
     expect($logReader->requiresScan())->toBeFalse()
         ->and($index->count())->toBe(2)
         ->and($index->getFlatIndex())->toHaveCount(2);
+});
+
+it('rebuilds a search index when its cache is evicted but file metadata survives', function () {
+    $path = $this->file->path;
+
+    $read = function () use ($path) {
+        IndexedLogReader::clearInstances();
+
+        $logReader = (new LogFile($path))->logs()->search('Testing');
+        $logReader->scan();
+
+        return [
+            'requires_scan' => $logReader->requiresScan(),
+            'new_bytes' => $logReader->numberOfNewBytes(),
+            'total' => $logReader->total(),
+            'count' => count($logReader->reset()->get()),
+        ];
+    };
+
+    expect($read())->toMatchArray([
+        'requires_scan' => false,
+        'new_bytes' => 0,
+        'total' => 1,
+        'count' => 1,
+    ]);
+
+    $index = (new LogFile($path))->index('~Testing~iu');
+
+    LogViewerCache::forget(GenerateCacheKey::for($index, 'metadata'));
+    LogViewerCache::forget(GenerateCacheKey::for($index, 'chunk:0'));
+
+    expect($read())->toMatchArray([
+        'requires_scan' => false,
+        'new_bytes' => 0,
+        'total' => 1,
+        'count' => 1,
+    ]);
 });
 
 it('throws an exception when file cannot be opened for reading', function () {

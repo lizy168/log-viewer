@@ -274,6 +274,15 @@ class IndexedLogReader extends BaseLogReader implements LogReaderInterface
 
     public function requiresScan(): bool
     {
+        // File metadata can outlive index cache entries; rebuild when the index was lost.
+        if ($this->file->size() > 0) {
+            $index = $this->index();
+
+            if ($index->getLastScannedFilePosition() === 0 && $index->count() === 0) {
+                return true;
+            }
+        }
+
         if (isset($this->mtimeBeforeScan) && ($this->file->mtime() > $this->mtimeBeforeScan || $this->file->mtime() === time())) {
             // The file has been modified since the last scan in this request.
             // Let's only request another scan if it's not the last chunk (smaller than lazyScanChunkSize).
