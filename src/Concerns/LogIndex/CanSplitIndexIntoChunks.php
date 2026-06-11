@@ -35,7 +35,13 @@ trait CanSplitIndexIntoChunks
             $this->currentChunk = LogIndexChunk::fromDefinitionArray($this->currentChunkDefinition);
 
             if ($this->currentChunk->size > 0) {
-                $this->currentChunk->data = $this->getChunkDataFromCache($this->currentChunk->index, []);
+                $data = $this->getChunkDataFromCache($this->currentChunk->index);
+                $this->currentChunk->data = $data ?? [];
+
+                if (is_null($data)) {
+                    // The current chunk was evicted from cache while the metadata survived.
+                    $this->markForRebuild();
+                }
             }
         }
 

@@ -36,5 +36,9 @@ trait HasMetadata
         $this->maxChunkSize = $data['max_chunk_size'] ?? self::DEFAULT_CHUNK_SIZE;
         $this->chunkDefinitions = $data['chunk_definitions'] ?? [];
         $this->currentChunkDefinition = $data['current_chunk_definition'] ?? [];
+
+        // The memoized chunk object is derived from the definition loaded above,
+        // so it must not survive a metadata (re)load — e.g. after clearCache().
+        unset($this->currentChunk);
     }
 }

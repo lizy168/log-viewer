@@ -42,6 +42,10 @@ trait PreservesIndexingProgress
 
     public function markForRebuild(): void
     {
+        if ($this->rebuildRequired ?? false) {
+            return;
+        }
+
         $this->rebuildRequired = true;
 
         // Persist immediately so the next request sees the flag even though

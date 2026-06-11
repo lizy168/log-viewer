@@ -116,6 +116,37 @@ it('rebuilds the index when a cached chunk is evicted but metadata survives', fu
         ->and(count($logReader->reset()->get()))->toBe(2);
 });
 
+it('rebuilds the index when the current chunk is evicted but metadata survives', function () {
+    File::append($this->file->path, PHP_EOL.makeLaravelLogEntry());
+
+    $path = $this->file->path;
+    // Default chunk size, so both entries live in the single (current) chunk.
+    $this->file->logs()->scan();
+
+    expect($this->file->logs()->total())->toBe(2);
+
+    LogViewerCache::forget(GenerateCacheKey::for($this->file->index(), 'chunk:0'));
+
+    // The request that discovers the eviction flags the index for a rebuild.
+    IndexedLogReader::clearInstances();
+    $logReader = (new LogFile($path))->logs();
+
+    expect(count($logReader->get()))->toBe(0)
+        ->and($logReader->requiresScan())->toBeTrue();
+
+    // The next request (e.g. a page reload) rebuilds the index from scratch.
+    IndexedLogReader::clearInstances();
+    $logReader = (new LogFile($path))->logs();
+
+    expect($logReader->requiresScan())->toBeTrue();
+
+    $logReader->scan();
+
+    expect($logReader->requiresScan())->toBeFalse()
+        ->and($logReader->total())->toBe(2)
+        ->and(count($logReader->reset()->get()))->toBe(2);
+});
+
 it('does not flag a rebuild when reading a chunk the index does not know about', function () {
     $this->file->logs()->scan();
 
