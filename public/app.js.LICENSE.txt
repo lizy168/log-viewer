@@ -11,12 +11,6 @@
  * @license MIT
  */
 
-/*!
- * vue-router v4.6.4
- * (c) 2025 Eduardo San Martin Morote
- * @license MIT
- */
-
 /*! #__NO_SIDE_EFFECTS__ */
 
 /*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
