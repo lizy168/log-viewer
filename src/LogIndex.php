@@ -21,6 +21,7 @@ class LogIndex
     protected int $nextLogIndexToCreate;
     protected int $lastScannedFilePosition;
     protected int $lastScannedIndex;
+    protected bool $rebuildRequired;
 
     public function __construct(
         public LogFile $file,

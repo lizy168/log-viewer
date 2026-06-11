@@ -68,6 +68,12 @@ trait CanSplitIndexIntoChunks
             $chunkData = $currentChunk->data ?? [];
         } else {
             $chunkData = $this->getChunkDataFromCache($index);
+
+            if (is_null($chunkData) && ($this->getChunkDefinition($index)['size'] ?? 0) > 0) {
+                // The chunk was evicted from cache while the index metadata survived.
+                // Flag the index so the next scan rebuilds it from scratch.
+                $this->markForRebuild();
+            }
         }
 
         return $chunkData;

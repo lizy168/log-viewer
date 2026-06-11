@@ -83,6 +83,49 @@ it('rebuilds a search index when its cache is evicted but file metadata survives
     ]);
 });
 
+it('rebuilds the index when a cached chunk is evicted but metadata survives', function () {
+    File::append($this->file->path, PHP_EOL.makeLaravelLogEntry());
+
+    $path = $this->file->path;
+    $this->file->index()->setMaxChunkSize(1);
+    $this->file->logs()->scan();
+
+    expect($this->file->logs()->total())->toBe(2);
+
+    LogViewerCache::forget(GenerateCacheKey::for($this->file->index(), 'chunk:0'));
+
+    // The request that discovers the eviction serves the surviving chunks
+    // and flags the index for a rebuild.
+    IndexedLogReader::clearInstances();
+    $logReader = (new LogFile($path))->logs();
+
+    expect($logReader->requiresScan())->toBeFalse()
+        ->and(count($logReader->get()))->toBe(1)
+        ->and($logReader->requiresScan())->toBeTrue();
+
+    // The next request (e.g. a page reload) rebuilds the index from scratch.
+    IndexedLogReader::clearInstances();
+    $logReader = (new LogFile($path))->logs();
+
+    expect($logReader->requiresScan())->toBeTrue();
+
+    $logReader->scan();
+
+    expect($logReader->requiresScan())->toBeFalse()
+        ->and($logReader->total())->toBe(2)
+        ->and(count($logReader->reset()->get()))->toBe(2);
+});
+
+it('does not flag a rebuild when reading a chunk the index does not know about', function () {
+    $this->file->logs()->scan();
+
+    $index = $this->file->index();
+
+    expect($index->getChunkData(99))->toBeNull()
+        ->and($index->requiresRebuild())->toBeFalse()
+        ->and($this->file->logs()->requiresScan())->toBeFalse();
+});
+
 it('throws an exception when file cannot be opened for reading', function () {
     if (PHP_OS_FAMILY === 'Windows') {
         $this->markTestSkipped('File permissions work differently on Windows. The feature tested might still work.');
